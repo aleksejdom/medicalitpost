@@ -8,10 +8,13 @@ function NavigationBlock() {
 
   const navItems = [
     { name: 'Home', href: '/' },
-    { name: 'IT-Sicherheit', href: '/kategorie/it-sicherheit' },
     { name: 'Telematik', href: '/kategorie/telematik' },
-    { name: 'Software', href: '/kategorie/software' },
-    { name: 'Digitalisierung', href: '/kategorie/digitalisierung' }, 
+    { name: 'IT-Sicherheit', href: '/kategorie/it-sicherheit' },
+    { name: 'Software & KI', href: '/kategorie/software' },
+    { name: 'Medizintechnik', href: '/kategorie/medizintechnik' },
+    { name: 'Regelungen', href: '/kategorie/regelungen' },
+    { name: 'Digitalisierung', href: '/kategorie/digitalisierung' },
+    { name: 'Archiv', href: '/archiv' },
   ];
 
   return (

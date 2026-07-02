@@ -1,197 +1,137 @@
-# News Sync System - Dokumentation
+# News-Sync-System – Dokumentation
 
 ## Übersicht
 
-Das System fetcht automatisch Artikel von der [newsdata.io](https://newsdata.io) API, kategorisiert sie intelligent und speichert sie als `.md` Dateien.
+Das Portal sammelt automatisch aktuelle Nachrichten an der Schnittstelle
+**IT × Gesundheitswesen** (Telematik, TI-Gateway, Medizintechnik, Regelungen,
+Software/KI, Digitalisierung) aus kostenlosen Quellen, filtert sie per
+Keyword-Analyse, kategorisiert sie und archiviert sie als Markdown-Dateien
+unter `public/articles/<kategorie>/`. **Publiziert werden nur
+deutschsprachige Beiträge**; Dubletten werden über Original-Link und Titel
+verhindert.
+
+Dazu gibt es ein **Admin-Backend** (`/admin`) mit Abonnenten-, Werbe- und
+Quellen-Verwaltung sowie einen **DSGVO-konformen Newsletter**
+(Double-Opt-in, One-Click-Abmeldung).
+
+## News-Quellen
+
+Die Quellen liegen in `data/sources.json` und werden im Admin-Backend
+verwaltet (hinzufügen mit Feed-Test, pausieren, entfernen). Beim ersten
+Start wird die Datei mit den Standard-Quellen aus `lib/sources.ts` befüllt:
+
+| Quelle | Typ | Filterung |
+|---|---|---|
+| heise online | Atom | nur Artikel mit Gesundheitsbezug |
+| heise Security | Atom | nur Artikel mit Gesundheitsbezug |
+| Golem.de | RSS | nur Artikel mit Gesundheitsbezug |
+| it-daily.net | RSS | nur Artikel mit Gesundheitsbezug |
+| Bundesgesundheitsministerium (Meldungen) | RSS | nur Artikel mit IT/Digital-Bezug |
+| mednic | RSS | ungefiltert (Health-IT-Fachportal) |
+| Healthcare Computing | RSS | ungefiltert (Health-IT-Fachportal) |
+| netzpolitik.org | RSS | nur Artikel mit Gesundheitsbezug |
+| ZEIT Digital | RSS | nur Artikel mit Gesundheitsbezug |
+| ZEIT Gesundheit | RSS | nur Artikel mit IT-Bezug |
+| SPIEGEL Netzwelt | RSS | nur Artikel mit Gesundheitsbezug |
+| SPIEGEL Gesundheit | RSS | nur Artikel mit IT-Bezug |
+| t3n | RSS | nur Artikel mit Gesundheitsbezug |
+| eGovernment.de | RSS | nur Artikel mit Gesundheitsbezug |
+| newsdata.io API | JSON | Gesundheits- UND IT-Bezug (Key in `.env`) |
+
+Geprüft, aber nicht nutzbar (kein RSS-Feed oder blockiert): aerzteblatt.de,
+gematik.de, kma-online.de, Healthcare IT News, mobihealthnews, E-HEALTH-COM,
+apotheke-adhoc.de, Ärzte Zeitung, Tagesspiegel Background.
 
 ## Komponenten
 
-### 1. **NewsData Service** (`lib/newsDataService.ts`)
-- Fetcht Artikel von newsdata.io API
-- Kategorisiert Artikel intelligent basierend auf Keywords
-- Konvertiert Artikel zu Markdown-Format
+**News-Pipeline**
+- `lib/sources.ts` – Standard-Quellen (Seed), `lib/sourceStore.ts` – verwaltbare Quellen (`data/sources.json`)
+- `lib/categorize.ts` – Relevanz-Prüfung + Kategorisierung (Keyword-Matching mit Wortgrenzen)
+- `lib/newsService.ts` – Feed-Abruf (RSS 2.0 + Atom), newsdata.io, Werbe-Blocklist, Altersfilter (max. 45 Tage), nur Deutsch
+- `lib/articleStore.ts` – Speichern/Lesen der `.md`-Dateien, Dedupe über Link **und** Titel (beim Speichern und beim Lesen)
+- `lib/sync.ts` – `syncNews()` + `ensureFreshArticles()` (automatischer Sync, max. 1×/Stunde)
+- `app/api/articles/sync/route.ts` – Sync-Endpoint für Cron-Jobs
 
-### 2. **Article Storage Service** (`lib/articleStorageService.ts`)
-- Speichert Artikel als `.md` Dateien im Verzeichnis `public/articles/`
-- Organisiert nach Kategorien in Unterordnern
-- Liest und parst Artikel zurück aus den Dateien
+**Seiten**
+- `app/page.tsx` – Startseite (24 neueste Artikel + Newsletter-Anmeldung)
+- `app/kategorie/[kategorie]/page.tsx` – Kategorie-Archiv
+- `app/kategorie/[kategorie]/[id]/page.tsx` – Beitragsseite (ausführliche Zusammenfassung, ein Original-Link, verwandte Artikel)
+- `app/archiv/page.tsx` – Gesamtarchiv nach Monat
+- `app/datenschutz/page.tsx` – Datenschutzerklärung (Vorlage – Kontaktdaten ergänzen!)
+- `app/newsletter/page.tsx` – Statusseite für Bestätigung/Abmeldung
 
-### 3. **Sync API Endpoint** (`api/articles/sync/route.ts`)
-- REST-Endpoint zum manuellen Triggern der Synchronisation
-- Optional mit API-Key-Authentifizierung
+**Newsletter (DSGVO-konform)**
+- `lib/subscriberStore.ts` – Abonnenten in `data/subscribers.json` (nicht öffentlich, nicht im Git): Double-Opt-in-Status, Einwilligungszeitpunkte + -wortlaut
+- `lib/newsletter.ts` – Newsletter-HTML (News 1 → **Werbe-Section** → News 2), Bestätigungs-Mail, Versand mit Sende-Log (keine doppelt verschickten News)
+- `lib/adStore.ts` – Werbe-Section (`data/newsletter-ad.json`): Titel, Text, Bildmotiv, Link, Button
+- `lib/mailer.ts` – SMTP-Versand; ohne SMTP-Konfiguration werden Mails samt Links in die Konsole geloggt (lokales Testen)
+- API: `POST /api/newsletter/subscribe`, `GET /api/newsletter/confirm`, `GET /api/newsletter/unsubscribe`, `POST /api/newsletter/send`
 
-### 4. **Kategorieseiten** (`kategorie/[kategorie]/page.tsx`)
-- Zeigt alle Artikel einer Kategorie an
-- Grid-Layout mit Bildern
-- Links zu Detailseiten
+**Admin-Backend (`/admin`)**
+- Login über `ADMIN_PASSWORD` (.env), httpOnly-Session-Cookie (8 h)
+- Tab „Abonnenten“: Liste mit Status/Zeitpunkten, Abmelden/Aktivieren, vollständiges Löschen (Art. 17 DSGVO)
+- Tab „Newsletter & Werbung“: Werbe-Section gestalten (Text, Bildmotiv, Link, Button), HTML-Vorschau, manueller Versand
+- Tab „News-Quellen“: RSS-Quellen hinzufügen (mit Feed-Test), pausieren, entfernen
 
-### 5. **Artikel-Detailseiten** (`kategorie/[kategorie]/[id]/page.tsx`)
-- Vollständige Artikel-Darstellung
-- Verwandte Artikel-Vorschläge
-- Breadcrumb-Navigation
-- Link zum Original-Artikel
+## Kategorien
 
-## Verwendung
+`telematik`, `it-sicherheit`, `software`, `medizintechnik`, `regelungen`,
+`digitalisierung` – definiert in `lib/categorize.ts` (`CATEGORIES`).
 
-### Manuelle Synchronisation
+## Aktualität & Cron
+
+1. **Artikel:** Jeder Aufruf der Startseite synct automatisch, wenn der
+   letzte Sync älter als 60 Minuten ist. Für Produktion zusätzlich:
 
 ```bash
-# Via cURL
-curl http://localhost:3000/api/articles/sync
-
-# Mit API-Key (falls konfiguriert)
-curl -H "Authorization: Bearer your-secret-key" http://localhost:3000/api/articles/sync
+curl https://deine-domain.de/api/articles/sync
 ```
 
-### Automatische Synchronisation
+2. **Newsletter (täglich 1–2 News):** täglichen Cron-Job einrichten, z.B. 07:00:
 
-Verwende einen Cron-Service wie [EasyCron](https://www.easycron.com/) oder GitHub Actions:
+```bash
+curl -X POST -H "Authorization: Bearer $SYNC_API_KEY" https://deine-domain.de/api/newsletter/send
+```
+
+GitHub-Actions-Beispiel:
 
 ```yaml
-# .github/workflows/sync-articles.yml
-name: Sync Articles
+name: Daily
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Alle 6 Stunden
-
+    - cron: '0 5 * * *'   # 07:00 MESZ
 jobs:
-  sync:
+  newsletter:
     runs-on: ubuntu-latest
     steps:
-      - name: Sync articles
-        run: |
-          curl -X GET http://your-domain.com/api/articles/sync \
-            -H "Authorization: Bearer ${{ secrets.SYNC_API_KEY }}"
+      - run: curl -fsS https://deine-domain.de/api/articles/sync
+      - run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${{ secrets.SYNC_API_KEY }}" \
+            https://deine-domain.de/api/newsletter/send
 ```
 
-## Verzeichnisstruktur
+## Umgebungsvariablen (`.env`)
 
-```
-public/
-└── articles/
-    ├── it-sicherheit/
-    │   ├── article-1.md
-    │   └── article-2.md
-    ├── telematik/
-    │   └── article-3.md
-    ├── software/
-    └── ...
-```
+- `NEWSDATA_API_KEY` – Key für newsdata.io (kostenloser Plan)
+- `ADMIN_PASSWORD` – Passwort für das Admin-Backend (**unbedingt ändern!**)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` – Mail-Versand
+- `BASE_URL` – öffentliche URL (für Links in E-Mails)
+- `SYNC_API_KEY` – optional; sichert Sync- und Newsletter-Endpoint für Cron-Jobs ab
 
-## Kategorie-Mapping
+## DSGVO-Checkliste Newsletter
 
-| URL-Slug | Kategorie |
-|----------|-----------|
-| `it-sicherheit` | IT-Sicherheit |
-| `telematik` | Telematik |
-| `software` | Software |
-| `digitalisierung` | Digitalisierung |
-| `gesundheit` | Gesundheit |
-| `digital-healthcare` | Digital Healthcare |
+- ✅ Double-Opt-in mit dokumentiertem Einwilligungswortlaut und Zeitpunkten
+- ✅ Abmeldelink in jeder E-Mail (One-Click, tokenbasiert)
+- ✅ Vollständige Datenlöschung im Admin-Backend
+- ✅ Einwilligungs-Checkbox mit Datenschutz-Link im Anmeldeformular
+- ✅ Daten lokal in `data/` (per .gitignore vom Repository ausgeschlossen)
+- ⚠️ `app/datenschutz/page.tsx`: Anschrift/Kontakt ergänzen und juristisch prüfen lassen
 
-## Umgebungsvariablen
+## Hinweis zum Hosting
 
-Setze diese in deiner `.env.local`:
-
-```env
-# NewsData API Key (optional, nutzt default wenn nicht gesetzt)
-NEXT_PUBLIC_NEWSDATA_API_KEY=pub_740d805f1d334f91988ea89a4f637df2
-
-# Sync API Key für sichere Synchronisation
-SYNC_API_KEY=your-secret-key
-```
-
-## Filterkonfiguration
-
-Die Filterbegriffe sind zentral in `app/config/articleFilters.ts` definiert:
-
-```typescript
-export const ARTICLE_FILTERS = {
-  categories: ['IT-Sicherheit', 'Telematik', ...],
-  keywords: ['it-sicherheit', 'cybersicherheit', ...]
-}
-```
-
-## Artikel-Format (Markdown)
-
-```markdown
----
-id: "article-1234"
-title: "Artikel-Titel"
-description: "Kurzbeschreibung"
-date: "2024-12-12T10:30:00"
-source: "Quelle"
-category: "IT-Sicherheit"
-image: "https://example.com/image.jpg"
-link: "https://original-source.com/article"
-keywords: ["keyword1", "keyword2"]
----
-
-# Artikel-Titel
-
-**Quelle:** Quelle  
-**Datum:** 12. Dezember 2024  
-**Kategorie:** IT-Sicherheit
-
-![Artikel-Titel](https://example.com/image.jpg)
-
-## Zusammenfassung
-
-Artikel-Beschreibung...
-
-## Vollständiger Artikel
-
-Artikel-Inhalt...
-
----
-
-[Zum Originalartikel](https://original-source.com/article)
-```
-
-## Kategorisierung
-
-Artikel werden automatisch kategorisiert basierend auf Keywords in Titel, Beschreibung und Inhalt:
-
-- **IT-Sicherheit**: sicherheit, cybersicherheit, cyberangriff, firewall, etc.
-- **Telematik**: telematik, ti-dienste, vpn, vzdentity, etc.
-- **Software**: software, update, patch, version, api, etc.
-- **Digitalisierung**: digital, e-health, vernetzung, interoperabilität, etc.
-- **Gesundheit**: erezept, epa, patient, arzt, krankenhaus, etc.
-- **Digital Healthcare**: alles andere
-
-## Features
-
-✅ Automatisches Fetchen von News  
-✅ Intelligente Kategorisierung  
-✅ Persistente Speicherung als Markdown  
-✅ Responsive Kategorieseiten  
-✅ Detailseiten für jeden Artikel  
-✅ Verwandte Artikel-Vorschläge  
-✅ SEO-freundlich  
-✅ Static Generation mit ISR  
-
-## API-Limits
-
-NewsData.io API:
-- **Free Tier**: 200 Requests pro Monat
-- **Pro Tier**: 100 Requests pro Tag
-
-Empfohlene Sync-Frequenz: **1-2 mal täglich**
-
-## Troubleshooting
-
-### Keine Artikel werden angezeigt
-
-1. Überprüfe die API-Key in `.env.local`
-2. Rufe `/api/articles/sync` auf
-3. Prüfe `public/articles/` ob Dateien erstellt wurden
-
-### Artikel werden falsch kategorisiert
-
-- Passe Keywords in `app/config/articleFilters.ts` an
-- Rufe erneut `/api/articles/sync` auf
-
-### Alte Artikel anzeigen
-
-- Lösche `public/articles/` um neu zu synchronisieren
-- Oder implementiere Update-Logik in `articleStorageService.ts`
+Artikel, Abonnenten und Quellen werden ins Dateisystem geschrieben
+(`public/articles/`, `data/`). Das funktioniert lokal und auf jedem
+Server/VPS mit persistentem Dateisystem. Auf **Vercel/Netlify (Serverless)**
+ist das Dateisystem flüchtig – dort müsste die Speicherung auf eine
+Datenbank (z.B. Supabase) umgestellt werden.

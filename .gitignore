@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# newsletter/quellen daten (enthaelt personenbezogene daten)
+/data

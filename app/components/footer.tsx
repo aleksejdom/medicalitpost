@@ -20,7 +20,7 @@ function FooterBlock() {
             The Medical IT Post ist die führende Nachrichtenquelle für IT-Entscheider in Arztpraxen, MVZ und Kliniken in Deutschland.
           </p>
         </div>
-        <div>
+        {/* <div>
           <p className='uppercase text-sm font-bold'>Kategorien</p>
           <div className='flex flex-col gap-2 mt-4'>
             {navItems.map((item) => (
@@ -33,13 +33,15 @@ function FooterBlock() {
               </Link>
             ))}
           </div>
-        </div>
+        </div> */}
       </div> 
       <p className='text-sm text-gray-400 mt-5 mb-1'>
         Alle Artikel basieren auf öffentlich zugänglichen Informationen und wurden automatisch in eigenen Worten zusammengefasst.
       </p>
       <p className='text-sm text-gray-600 mt-1 mb-5 uppercase'>
         © 2025 The Medical IT Post. Alle Rechte vorbehalten. | Powered by IT-ÄRZTE GmbH
+        {' | '}
+        <Link href='/datenschutz' className='hover:text-blue-500'>Datenschutz</Link>
       </p>
     </>
   )

@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { Playfair_Display } from 'next/font/google';
+import { Old_Standard_TT } from 'next/font/google';
 import "./globals.css";
 import { MenuProvider } from "./context/MenuContext";
 
- const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
+// Klassische Zeitungs-Antiqua mit sauberen deutschen Umlauten
+// (latin-ext für ä, ö, ü, ß und „deutsche Anführungszeichen“)
+const oldStandard = Old_Standard_TT({
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  subsets: ['latin', 'latin-ext'],
+  variable: '--font-newspaper',
 });
 
 
@@ -20,9 +24,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: Browser-Extensions injizieren Attribute
+    // (z.B. data-far-editor-bridge) ins <html>-Tag, bevor React hydriert –
+    // das würde sonst einen Hydration-Mismatch-Fehler auslösen
+    <html lang="de" suppressHydrationWarning>
       <body
-        className={`${playfair.variable} antialiased`}
+        className={`${oldStandard.variable} antialiased`}
       >
         <MenuProvider>
           {children}

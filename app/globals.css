@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   --background: #ffffff;
@@ -6,9 +7,8 @@
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: "Playfair Display", serif;
-  font-optical-sizing: auto;
-  font-weight: 600;
+  font-family: var(--font-newspaper), Georgia, "Times New Roman", serif;
+  font-weight: 700;
 }
 
 @theme inline {
@@ -16,6 +16,8 @@ h1, h2, h3, h4, h5, h6 {
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Tailwind-Klasse font-serif nutzt die Zeitungsschrift */
+  --font-serif: var(--font-newspaper), Georgia, "Times New Roman", serif;
 }
  
 
