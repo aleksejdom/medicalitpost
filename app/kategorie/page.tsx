@@ -9,8 +9,8 @@ import { CATEGORIES } from "@/lib/categorize";
 
 export const dynamic = "force-dynamic";
 
-export default function KategorienUebersicht() {
-  const articles = getAllArticles();
+export default async function KategorienUebersicht() {
+  const articles = await getAllArticles();
   const counts = new Map<string, number>();
   for (const article of articles) {
     counts.set(article.category, (counts.get(article.category) || 0) + 1);

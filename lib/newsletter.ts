@@ -4,9 +4,9 @@ import { CATEGORIES } from "./categorize";
 import { getNewsletterAd, NewsletterAd } from "./adStore";
 import { getActiveSubscribers, Subscriber } from "./subscriberStore";
 import { getBaseUrl, sendMail } from "./mailer";
-import { readJson, writeJson } from "./jsonStore";
+import { getSetting, setSetting } from "./db";
 
-const LOG_FILE = "newsletter-log.json";
+const LOG_KEY = "newsletter_log";
 
 interface NewsletterLog {
   sentArticleIds: string[];
@@ -98,11 +98,11 @@ function layout(bodyRows: string, unsubscribeUrl: string): string {
 }
 
 /** Baut den kompletten Newsletter: News 1 – Werbe-Section – News 2. */
-export function buildNewsletterHtml(
+export async function buildNewsletterHtml(
   articles: StoredArticle[],
   unsubscribeUrl: string
-): string {
-  const ad = getNewsletterAd();
+): Promise<string> {
+  const ad = await getNewsletterAd();
   const [first, second] = articles;
   const rows = [
     first ? articleSection(first) : "",
@@ -113,12 +113,11 @@ export function buildNewsletterHtml(
 }
 
 /** Die 1–2 neuesten Beiträge, die noch in keinem Newsletter waren. */
-export function pickNewsletterArticles(): StoredArticle[] {
-  const log = readJson<NewsletterLog>(LOG_FILE, { sentArticleIds: [] });
+export async function pickNewsletterArticles(): Promise<StoredArticle[]> {
+  const log = await getSetting<NewsletterLog>(LOG_KEY, { sentArticleIds: [] });
   const sent = new Set(log.sentArticleIds);
-  return getAllArticles()
-    .filter((article) => !sent.has(article.id))
-    .slice(0, 2);
+  const articles = await getAllArticles();
+  return articles.filter((article) => !sent.has(article.id)).slice(0, 2);
 }
 
 export interface SendReport {
@@ -130,7 +129,7 @@ export interface SendReport {
 
 /** Versendet den täglichen Newsletter an alle aktiven Abonnenten. */
 export async function sendDailyNewsletter(): Promise<SendReport> {
-  const articles = pickNewsletterArticles();
+  const articles = await pickNewsletterArticles();
   if (articles.length === 0) {
     return {
       recipients: 0,
@@ -140,7 +139,7 @@ export async function sendDailyNewsletter(): Promise<SendReport> {
     };
   }
 
-  const subscribers = getActiveSubscribers();
+  const subscribers = await getActiveSubscribers();
   const errors: string[] = [];
   let recipients = 0;
 
@@ -149,7 +148,7 @@ export async function sendDailyNewsletter(): Promise<SendReport> {
       await sendMail({
         to: subscriber.email,
         subject: `Ihre News aus IT & Gesundheitswesen: ${articles[0].title}`,
-        html: buildNewsletterHtml(articles, unsubscribeUrl(subscriber)),
+        html: await buildNewsletterHtml(articles, unsubscribeUrl(subscriber)),
       });
       recipients++;
     } catch (error) {
@@ -157,13 +156,13 @@ export async function sendDailyNewsletter(): Promise<SendReport> {
     }
   }
 
-  const log = readJson<NewsletterLog>(LOG_FILE, { sentArticleIds: [] });
+  const log = await getSetting<NewsletterLog>(LOG_KEY, { sentArticleIds: [] });
   log.sentArticleIds = [
     ...log.sentArticleIds,
     ...articles.map((a) => a.id),
   ].slice(-500);
   log.lastSentAt = new Date().toISOString();
-  writeJson(LOG_FILE, log);
+  await setSetting(LOG_KEY, log);
 
   return { recipients, articles: articles.map((a) => a.title), errors };
 }

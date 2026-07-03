@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 /** One-Click-Abmeldung über den Link im Newsletter (DSGVO). */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token") || "";
-  const subscriber = unsubscribeByToken(token);
+  const subscriber = await unsubscribeByToken(token);
   const target = subscriber
     ? "/newsletter?status=abgemeldet"
     : "/newsletter?status=ungueltig";

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 /** Double-Opt-in-Bestätigung über den Link aus der E-Mail. */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token") || "";
-  const subscriber = confirmSubscription(token);
+  const subscriber = await confirmSubscription(token);
   const target = subscriber
     ? "/newsletter?status=bestaetigt"
     : "/newsletter?status=ungueltig";

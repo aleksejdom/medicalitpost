@@ -8,7 +8,7 @@ export async function GET() {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json(getNewsletterAd());
+  return NextResponse.json(await getNewsletterAd());
 }
 
 /** Werbe-Section des Newsletters speichern. */
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   if (!input || typeof input !== "object") {
     return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
   }
-  const saved = saveNewsletterAd({
+  const saved = await saveNewsletterAd({
     enabled: Boolean(input.enabled),
     title: String(input.title ?? ""),
     text: String(input.text ?? ""),

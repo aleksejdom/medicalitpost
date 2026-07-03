@@ -13,7 +13,7 @@ export async function GET() {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json(getSources());
+  return NextResponse.json(await getSources());
 }
 
 /** Neue RSS-Quelle hinzufügen (mit Feed-Validierung). */
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return NextResponse.json(addSource({ name, url, mode, language }));
+    return NextResponse.json(await addSource({ name, url, mode, language }));
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
@@ -75,7 +75,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id, enabled } = await request.json().catch(() => ({}));
-  const ok = setSourceEnabled(String(id || ""), Boolean(enabled));
+  const ok = await setSourceEnabled(String(id || ""), Boolean(enabled));
   return ok
     ? NextResponse.json({ ok: true })
     : NextResponse.json({ error: "Quelle nicht gefunden." }, { status: 404 });
@@ -87,7 +87,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await request.json().catch(() => ({}));
-  const ok = removeSource(String(id || ""));
+  const ok = await removeSource(String(id || ""));
   return ok
     ? NextResponse.json({ ok: true })
     : NextResponse.json({ error: "Quelle nicht gefunden." }, { status: 404 });

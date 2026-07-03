@@ -1,8 +1,8 @@
-import { readJson, writeJson } from "./jsonStore";
+import { getSetting, setSetting } from "./db";
 
 /**
  * Vom Admin gestaltete Werbe-Section, die im Newsletter
- * zwischen den beiden News platziert wird.
+ * zwischen den beiden News platziert wird (mp_settings).
  */
 export interface NewsletterAd {
   enabled: boolean;
@@ -13,7 +13,7 @@ export interface NewsletterAd {
   buttonText: string;
 }
 
-const FILE = "newsletter-ad.json";
+const KEY = "newsletter_ad";
 
 const DEFAULT_AD: NewsletterAd = {
   enabled: false,
@@ -24,12 +24,15 @@ const DEFAULT_AD: NewsletterAd = {
   buttonText: "Mehr erfahren",
 };
 
-export function getNewsletterAd(): NewsletterAd {
-  return { ...DEFAULT_AD, ...readJson<Partial<NewsletterAd>>(FILE, {}) };
+export async function getNewsletterAd(): Promise<NewsletterAd> {
+  const stored = await getSetting<Partial<NewsletterAd>>(KEY, {});
+  return { ...DEFAULT_AD, ...stored };
 }
 
-export function saveNewsletterAd(ad: Partial<NewsletterAd>): NewsletterAd {
-  const merged = { ...getNewsletterAd(), ...ad };
-  writeJson(FILE, merged);
+export async function saveNewsletterAd(
+  ad: Partial<NewsletterAd>
+): Promise<NewsletterAd> {
+  const merged = { ...(await getNewsletterAd()), ...ad };
+  await setSetting(KEY, merged);
   return merged;
 }

@@ -25,7 +25,7 @@ export default async function ArtikelPage({
   params: Promise<{ kategorie: string; id: string }>;
 }) {
   const { kategorie, id } = await params;
-  const article = getArticle(kategorie, id);
+  const article = await getArticle(kategorie, id);
 
   if (!article) {
     notFound();
@@ -33,7 +33,7 @@ export default async function ArtikelPage({
 
   const label = CATEGORIES[kategorie] || kategorie;
   const date = article.date ? new Date(article.date) : null;
-  const related = getArticlesByCategory(kategorie)
+  const related = (await getArticlesByCategory(kategorie))
     .filter((a) => a.id !== article.id)
     .slice(0, 3);
 

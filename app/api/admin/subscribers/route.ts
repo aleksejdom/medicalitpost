@@ -12,7 +12,7 @@ export async function GET() {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json(getSubscribers());
+  return NextResponse.json(await getSubscribers());
 }
 
 /** Abo-Status ändern (aktivieren/abmelden). */
@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest) {
   if (!email || !["pending", "active", "unsubscribed"].includes(status)) {
     return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
   }
-  const ok = setSubscriberStatus(email, status);
+  const ok = await setSubscriberStatus(email, status);
   return ok
     ? NextResponse.json({ ok: true })
     : NextResponse.json({ error: "Adresse nicht gefunden." }, { status: 404 });
@@ -36,7 +36,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { email } = await request.json().catch(() => ({}));
-  const ok = deleteSubscriber(String(email || ""));
+  const ok = await deleteSubscriber(String(email || ""));
   return ok
     ? NextResponse.json({ ok: true })
     : NextResponse.json({ error: "Adresse nicht gefunden." }, { status: 404 });

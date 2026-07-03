@@ -15,9 +15,9 @@ export default async function AdminPage() {
 
   return (
     <AdminDashboard
-      initialSubscribers={getSubscribers()}
-      initialAd={getNewsletterAd()}
-      initialSources={getSources()}
+      initialSubscribers={await getSubscribers()}
+      initialAd={await getNewsletterAd()}
+      initialSources={await getSources()}
     />
   );
 }

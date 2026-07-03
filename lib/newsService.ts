@@ -222,8 +222,9 @@ export interface CollectResult {
 
 /** Sammelt Artikel aus allen Quellen. Fehler einzelner Quellen brechen nichts ab. */
 export async function collectArticles(): Promise<CollectResult> {
+  const sources = await getEnabledSources();
   const tasks: Array<Promise<Article[]>> = [
-    ...getEnabledSources().map((source) => fetchRssSource(source)),
+    ...sources.map((source) => fetchRssSource(source)),
     fetchNewsdata(),
   ];
 

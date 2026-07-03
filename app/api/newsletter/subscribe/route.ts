@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const subscriber = subscribe(String(email || ""));
+    const subscriber = await subscribe(String(email || ""));
     await sendConfirmationMail(subscriber);
     return NextResponse.json({
       ok: true,

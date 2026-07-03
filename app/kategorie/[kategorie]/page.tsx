@@ -17,7 +17,7 @@ export default async function KategoriePage({
   params: Promise<{ kategorie: string }>;
 }) {
   const { kategorie } = await params;
-  const articles = getArticlesByCategory(kategorie);
+  const articles = await getArticlesByCategory(kategorie);
   const label = CATEGORIES[kategorie];
 
   if (!label && articles.length === 0) {

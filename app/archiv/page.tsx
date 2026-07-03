@@ -9,8 +9,8 @@ import { CATEGORIES } from "@/lib/categorize";
 
 export const dynamic = "force-dynamic";
 
-export default function ArchivPage() {
-  const articles = getAllArticles();
+export default async function ArchivPage() {
+  const articles = await getAllArticles();
 
   // Nach Monat gruppieren
   const groups = new Map<string, typeof articles>();

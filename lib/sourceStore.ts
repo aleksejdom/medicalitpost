@@ -1,73 +1,97 @@
 import crypto from "crypto";
-import { readJson, writeJson } from "./jsonStore";
+import { db } from "./db";
 import { RSS_SOURCES, RssSource } from "./sources";
 
 /**
- * Verwaltbare News-Quellen (Admin-Backend). Wird beim ersten Zugriff
- * mit den Standard-Quellen aus lib/sources.ts befüllt.
+ * Verwaltbare News-Quellen (Admin-Backend) in Supabase (Tabelle mp_sources).
+ * Wird beim ersten Zugriff mit den Standard-Quellen aus lib/sources.ts befüllt.
  */
 export interface ManagedSource extends RssSource {
   id: string;
   enabled: boolean;
 }
 
-const FILE = "sources.json";
-
-function seed(): ManagedSource[] {
-  const seeded = RSS_SOURCES.map((source) => ({
-    ...source,
-    id: crypto.createHash("sha1").update(source.url).digest("hex").slice(0, 8),
-    enabled: true,
-  }));
-  writeJson(FILE, seeded);
-  return seeded;
+function sourceId(url: string): string {
+  return crypto.createHash("sha1").update(url).digest("hex").slice(0, 8);
 }
 
-export function getSources(): ManagedSource[] {
-  const sources = readJson<ManagedSource[] | null>(FILE, null);
-  return sources ?? seed();
+export async function getSources(): Promise<ManagedSource[]> {
+  const { data, error } = await db()
+    .from("mp_sources")
+    .select("*")
+    .order("name");
+  if (error) {
+    console.error("Quellen laden fehlgeschlagen:", error.message);
+    return [];
+  }
+
+  if (!data || data.length === 0) {
+    // Erststart: mit Standard-Quellen befüllen
+    const seeded = RSS_SOURCES.map((source) => ({
+      id: sourceId(source.url),
+      name: source.name,
+      url: source.url,
+      language: source.language,
+      mode: source.mode,
+      enabled: true,
+    }));
+    const { error: seedError } = await db()
+      .from("mp_sources")
+      .upsert(seeded, { onConflict: "url", ignoreDuplicates: true });
+    if (seedError) {
+      console.error("Quellen-Seed fehlgeschlagen:", seedError.message);
+    }
+    return seeded as ManagedSource[];
+  }
+
+  return data as ManagedSource[];
 }
 
-export function getEnabledSources(): ManagedSource[] {
-  return getSources().filter((source) => source.enabled);
+export async function getEnabledSources(): Promise<ManagedSource[]> {
+  return (await getSources()).filter((source) => source.enabled);
 }
 
-export function addSource(input: {
+export async function addSource(input: {
   name: string;
   url: string;
   language?: "de" | "en";
   mode?: RssSource["mode"];
-}): ManagedSource {
-  const sources = getSources();
-  if (sources.some((source) => source.url === input.url)) {
-    throw new Error("Diese Quelle existiert bereits.");
-  }
+}): Promise<ManagedSource> {
   const source: ManagedSource = {
-    id: crypto.createHash("sha1").update(input.url).digest("hex").slice(0, 8),
+    id: sourceId(input.url),
     name: input.name,
     url: input.url,
     language: input.language || "de",
     mode: input.mode || "none",
     enabled: true,
   };
-  sources.push(source);
-  writeJson(FILE, sources);
+  const { error } = await db().from("mp_sources").insert(source);
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("Diese Quelle existiert bereits.");
+    }
+    throw new Error(`Quelle speichern: ${error.message}`);
+  }
   return source;
 }
 
-export function removeSource(id: string): boolean {
-  const sources = getSources();
-  const remaining = sources.filter((source) => source.id !== id);
-  if (remaining.length === sources.length) return false;
-  writeJson(FILE, remaining);
-  return true;
+export async function removeSource(id: string): Promise<boolean> {
+  const { data, error } = await db()
+    .from("mp_sources")
+    .delete()
+    .eq("id", id)
+    .select("id");
+  return !error && (data || []).length > 0;
 }
 
-export function setSourceEnabled(id: string, enabled: boolean): boolean {
-  const sources = getSources();
-  const source = sources.find((s) => s.id === id);
-  if (!source) return false;
-  source.enabled = enabled;
-  writeJson(FILE, sources);
-  return true;
+export async function setSourceEnabled(
+  id: string,
+  enabled: boolean
+): Promise<boolean> {
+  const { data, error } = await db()
+    .from("mp_sources")
+    .update({ enabled })
+    .eq("id", id)
+    .select("id");
+  return !error && (data || []).length > 0;
 }

@@ -14,7 +14,7 @@ export default async function Home() {
   // Hält das Archiv tagesaktuell (synct höchstens einmal pro Stunde)
   await ensureFreshArticles(60);
 
-  const articles = getAllArticles();
+  const articles = await getAllArticles();
   const latest = articles.slice(0, 6);
 
   // Pro Kategorie eine eigene Sektion mit den neuesten Beiträgen

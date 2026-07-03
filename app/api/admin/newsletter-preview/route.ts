@@ -11,11 +11,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Vorschau: die nächsten ungesendeten News, sonst die 2 neuesten
-  let articles = pickNewsletterArticles();
+  let articles = await pickNewsletterArticles();
   if (articles.length === 0) {
-    articles = getAllArticles().slice(0, 2);
+    articles = (await getAllArticles()).slice(0, 2);
   }
-  const html = buildNewsletterHtml(articles, "#abmelden-beispiel");
+  const html = await buildNewsletterHtml(articles, "#abmelden-beispiel");
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });

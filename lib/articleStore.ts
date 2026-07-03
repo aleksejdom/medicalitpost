@@ -1,23 +1,23 @@
-import fs from "fs";
-import path from "path";
-import matter from "gray-matter";
 import { Article, StoredArticle } from "./types";
 import { hasHealthRelevance } from "./categorize";
+import { db } from "./db";
 
-const ARTICLES_DIR = path.join(process.cwd(), "public", "articles");
+/**
+ * Artikel-Archiv in Supabase (Tabelle mp_articles).
+ * Ersetzt die frühere Markdown-Datei-Ablage, weil das Dateisystem
+ * auf Vercel (Serverless) read-only ist.
+ */
 
-function articleToMarkdown(article: Article): string {
-  // Zusammenfassung so ausführlich wie möglich: Beschreibung als Einstieg,
-  // dazu der volle Meldungstext, sofern er mehr hergibt.
-  // Quelle, Datum, Kategorie und Original-Link rendert die Beitragsseite
-  // selbst – deshalb gehören sie nicht (doppelt) in den Markdown-Text.
+function buildBody(article: Article): string {
+  // Zusammenfassung so ausführlich wie möglich; Quelle, Datum, Kategorie
+  // und Original-Link rendert die Beitragsseite selbst.
   const summary = article.description || article.content;
   const hasDetails =
     article.content &&
     article.content !== article.description &&
     article.content.length > article.description.length;
 
-  const body = [
+  return [
     ...(article.image ? [`![${article.title}](${article.image})`, ""] : []),
     "## Zusammenfassung",
     "",
@@ -25,146 +25,133 @@ function articleToMarkdown(article: Article): string {
     "",
     ...(hasDetails ? ["## Im Detail", "", article.content, ""] : []),
   ].join("\n");
-
-  return matter.stringify(body, {
-    id: article.id,
-    title: article.title,
-    description: article.description,
-    date: article.date,
-    source: article.source,
-    category: article.category,
-    image: article.image || "",
-    link: article.link,
-    keywords: article.keywords,
-    language: article.language,
-  });
 }
 
-function parseFile(filePath: string, category: string): StoredArticle | null {
-  try {
-    const raw = fs.readFileSync(filePath, "utf-8");
-    const { data, content } = matter(raw);
-    if (!data.title) return null;
-    return {
-      id: data.id || path.basename(filePath, ".md"),
-      title: data.title,
-      description: data.description || "",
-      content: "",
-      date: data.date ? new Date(data.date).toISOString() : "",
-      source: data.source || "",
-      category: data.category?.toLowerCase?.() || category,
-      image: data.image || undefined,
-      link: data.link || "",
-      keywords: Array.isArray(data.keywords) ? data.keywords : [],
-      language: data.language === "en" ? "en" : "de",
-      body: content,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function listCategoryDirs(): string[] {
-  if (!fs.existsSync(ARTICLES_DIR)) return [];
-  return fs
-    .readdirSync(ARTICLES_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
-}
-
-/** Alle bereits archivierten Original-Links (zur Deduplizierung). */
-export function getArchivedLinks(): Set<string> {
-  const links = new Set<string>();
-  for (const article of getAllArticles()) {
-    if (article.link) links.add(article.link);
-  }
-  return links;
+function rowToArticle(row: Record<string, unknown>): StoredArticle {
+  return {
+    id: String(row.id),
+    title: String(row.title || ""),
+    description: String(row.description || ""),
+    content: "",
+    date: row.date ? new Date(String(row.date)).toISOString() : "",
+    source: String(row.source || ""),
+    category: String(row.category || "digitalisierung"),
+    image: row.image ? String(row.image) : undefined,
+    link: String(row.link || ""),
+    keywords: Array.isArray(row.keywords) ? (row.keywords as string[]) : [],
+    language: row.language === "en" ? "en" : "de",
+    body: String(row.body || ""),
+  };
 }
 
 function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9äöüß]+/g, " ").trim();
 }
 
-/** Speichert neue Artikel als .md-Dateien; gibt Anzahl neu gespeicherter zurück. */
-export function saveArticles(articles: Article[]): number {
-  const existingLinks = getArchivedLinks();
-  const existingTitles = new Set(
-    getAllArticles().map((a) => normalizeTitle(a.title))
-  );
-  let saved = 0;
+/** Speichert neue Artikel; gibt Anzahl neu gespeicherter zurück. */
+export async function saveArticles(articles: Article[]): Promise<number> {
+  const { data: existing, error } = await db()
+    .from("mp_articles")
+    .select("link, title");
+  if (error) throw new Error(`Artikel laden: ${error.message}`);
 
+  const existingLinks = new Set((existing || []).map((r) => r.link));
+  const existingTitles = new Set(
+    (existing || []).map((r) => normalizeTitle(String(r.title)))
+  );
+
+  const rows: Record<string, unknown>[] = [];
   for (const article of articles) {
     // Dedupe über Original-Link und Titel (derselbe Artikel kann über
     // mehrere Feeds mit unterschiedlichen URLs hereinkommen)
     if (existingLinks.has(article.link)) continue;
     if (existingTitles.has(normalizeTitle(article.title))) continue;
 
-    const dir = path.join(ARTICLES_DIR, article.category);
-    fs.mkdirSync(dir, { recursive: true });
-
-    const filePath = path.join(dir, `${article.id}.md`);
-    if (fs.existsSync(filePath)) continue;
-
-    fs.writeFileSync(filePath, articleToMarkdown(article), "utf-8");
+    rows.push({
+      id: article.id,
+      title: article.title,
+      description: article.description,
+      body: buildBody(article),
+      date: article.date,
+      source: article.source,
+      category: article.category,
+      image: article.image || null,
+      link: article.link,
+      keywords: article.keywords,
+      language: article.language,
+    });
     existingLinks.add(article.link);
     existingTitles.add(normalizeTitle(article.title));
-    saved++;
   }
 
-  return saved;
+  if (rows.length === 0) return 0;
+
+  const { error: insertError } = await db()
+    .from("mp_articles")
+    .upsert(rows, { onConflict: "link", ignoreDuplicates: true });
+  if (insertError) {
+    throw new Error(`Artikel speichern: ${insertError.message}`);
+  }
+  return rows.length;
 }
 
 /**
  * Alle archivierten Artikel, neueste zuerst.
  * Publiziert werden nur deutschsprachige Beiträge mit medizinischem
- * Bezug; Dubletten (gleicher Titel oder Link) werden auch beim Lesen
- * gefiltert – so verschwinden auch Altbestände, die die aktuellen
- * Kriterien nicht erfüllen.
+ * Bezug; Dubletten (gleicher Titel) werden auch beim Lesen gefiltert.
  */
-export function getAllArticles(): StoredArticle[] {
-  const articles: StoredArticle[] = [];
-
-  for (const category of listCategoryDirs()) {
-    const dir = path.join(ARTICLES_DIR, category);
-    for (const file of fs.readdirSync(dir)) {
-      if (!file.endsWith(".md")) continue;
-      const article = parseFile(path.join(dir, file), category);
-      if (
-        article &&
-        article.language === "de" &&
-        hasHealthRelevance(`${article.title} ${article.description} ${article.body}`)
-      ) {
-        articles.push(article);
-      }
-    }
+export async function getAllArticles(): Promise<StoredArticle[]> {
+  const { data, error } = await db()
+    .from("mp_articles")
+    .select("*")
+    .eq("language", "de")
+    .order("date", { ascending: false });
+  if (error) {
+    console.error("Artikel laden fehlgeschlagen:", error.message);
+    return [];
   }
 
-  articles.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-
   const seen = new Set<string>();
-  return articles.filter((article) => {
-    const titleKey = `t:${normalizeTitle(article.title)}`;
-    const linkKey = `l:${article.link}`;
-    if (seen.has(titleKey) || (article.link && seen.has(linkKey))) {
-      return false;
-    }
-    seen.add(titleKey);
-    seen.add(linkKey);
-    return true;
-  });
+  return (data || [])
+    .map(rowToArticle)
+    .filter((article) =>
+      hasHealthRelevance(
+        `${article.title} ${article.description} ${article.body}`
+      )
+    )
+    .filter((article) => {
+      const key = normalizeTitle(article.title);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
-export function getArticlesByCategory(category: string): StoredArticle[] {
-  return getAllArticles().filter((a) => a.category === category);
+export async function getArticlesByCategory(
+  category: string
+): Promise<StoredArticle[]> {
+  const articles = await getAllArticles();
+  return articles.filter((a) => a.category === category);
 }
 
-export function getArticle(
+export async function getArticle(
   category: string,
   id: string
-): StoredArticle | null {
-  const filePath = path.join(ARTICLES_DIR, category, `${id}.md`);
-  if (!fs.existsSync(filePath)) return null;
-  return parseFile(filePath, category);
+): Promise<StoredArticle | null> {
+  const { data, error } = await db()
+    .from("mp_articles")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return null;
+  const article = rowToArticle(data);
+  return article.category === category ? article : article;
+}
+
+/** Anzahl aller gespeicherten Artikel (für Sync-Statistik). */
+export async function countArticles(): Promise<number> {
+  const { count } = await db()
+    .from("mp_articles")
+    .select("*", { count: "exact", head: true });
+  return count || 0;
 }
