@@ -17,7 +17,8 @@ function ArticlePage({
   return (
     <div>
       <p className="text-xs text-gray-500 uppercase">Tech & Gesundheit</p>
-      <div className="flex items-baseline justify-between mb-6 gap-4">
+      {/* Mobile: Link unter dem Titel, Desktop: rechts daneben */}
+      <div className="flex flex-col items-start gap-1 mb-6 md:flex-row md:items-baseline md:justify-between md:gap-4">
         <h3 className="text-3xl">{title}</h3>
         {moreHref && (
           <Link
