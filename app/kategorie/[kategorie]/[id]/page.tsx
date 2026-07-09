@@ -18,6 +18,7 @@ import ArticleImage from "@/app/components/article-image";
 import NewsletterSignup from "@/app/components/newsletter-signup";
 import JsonLd from "@/app/components/json-ld";
 import { breadcrumbJsonLd, newsArticleJsonLd } from "@/lib/seo";
+import { paragraphizeMarkdown } from "@/lib/text";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -76,11 +77,15 @@ export default async function ArtikelPage({
 
   // Ältere Archiv-Dateien enthalten Metadaten und den Original-Link noch
   // im Markdown-Text – die rendert die Seite selbst, daher hier entfernen.
-  const body = article.body
-    .replace(/^#\s.*$/m, "")
-    .replace(/^\*\*(Quelle|Datum|Kategorie):\*\*.*$/gm, "")
-    .replace(/\n---\s*\n\s*\[Zum Originalartikel\]\([^)]*\)\s*$/, "")
-    .trim();
+  // paragraphizeMarkdown teilt überlange Textblöcke (Artikel, deren
+  // Absatzstruktur beim Import verloren ging) in lesbare Absätze auf.
+  const body = paragraphizeMarkdown(
+    article.body
+      .replace(/^#\s.*$/m, "")
+      .replace(/^\*\*(Quelle|Datum|Kategorie):\*\*.*$/gm, "")
+      .replace(/\n---\s*\n\s*\[Zum Originalartikel\]\([^)]*\)\s*$/, "")
+      .trim()
+  );
 
   return (
     <div className="flex bg-zinc-50 font-sans dark:bg-black flex-col items-center justify-center w-full p-4 md:p-3">

@@ -65,6 +65,21 @@ function stripHtml(html: string): string {
   );
 }
 
+/**
+ * Wie stripHtml, aber Block-Elemente (<p>, <br>, …) werden zu
+ * Markdown-Absätzen statt zu Leerzeichen – für den Artikel-Volltext,
+ * damit die Beitragsseite keinen endlosen Fließtext anzeigt.
+ */
+function stripHtmlKeepParagraphs(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "¶")
+    .replace(/<\/(p|div|li|h[1-6]|blockquote|tr)>/gi, "¶")
+    .split("¶")
+    .map((part) => stripHtml(part))
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 // Werbe-/Angebotsmeldungen, die keine News sind
 const TITLE_BLOCKLIST = [/^heise-angebot/i, /^anzeige[:\s]/i];
 
@@ -91,7 +106,7 @@ function parseFeed(xml: string): RawItem[] {
       title: stripHtml(text(item.title)),
       link: text(item.link).trim(),
       description: stripHtml(text(item.description)),
-      content: stripHtml(text(item["content:encoded"])),
+      content: stripHtmlKeepParagraphs(text(item["content:encoded"])),
       date: text(item.pubDate) || text(item["dc:date"]),
       image:
         item.enclosure?.["@_url"] ||
@@ -112,7 +127,7 @@ function parseFeed(xml: string): RawItem[] {
         title: stripHtml(text(entry.title)),
         link: alternate ? String(alternate["@_href"] || "") : "",
         description: stripHtml(text(entry.summary)),
-        content: stripHtml(text(entry.content)),
+        content: stripHtmlKeepParagraphs(text(entry.content)),
         date: text(entry.updated) || text(entry.published),
         image: undefined,
       };
@@ -249,7 +264,7 @@ async function fetchNewsdata(): Promise<Article[]> {
     title: r.title || "",
     link: r.link || "",
     description: stripHtml(r.description || ""),
-    content: stripHtml(r.content || ""),
+    content: stripHtmlKeepParagraphs(r.content || ""),
     date: r.pubDate || "",
     image: r.image_url || undefined,
   }));
