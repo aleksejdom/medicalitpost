@@ -17,9 +17,11 @@ export default function DatenschutzPage() {
           <p>
             IT-ÄRZTE GmbH – The Medical IT Post
             <br />
-            [Anschrift einsetzen]
+            Krämerstraße 20
             <br />
-            E-Mail: [Kontakt-E-Mail einsetzen]
+            72764 Reutlingen
+            <br />
+            E-Mail: redaktion@medicalitpost.de
           </p>
 
           <h2 className="text-xl font-bold mt-4">2. Newsletter</h2>

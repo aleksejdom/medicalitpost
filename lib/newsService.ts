@@ -19,21 +19,50 @@ interface RawItem {
   image?: string;
 }
 
+// Häufige benannte HTML-Entities deutscher Feeds (Umlaute, Anführungszeichen)
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  auml: "ä",
+  ouml: "ö",
+  uuml: "ü",
+  Auml: "Ä",
+  Ouml: "Ö",
+  Uuml: "Ü",
+  szlig: "ß",
+  euro: "€",
+  ndash: "–",
+  mdash: "—",
+  hellip: "…",
+  bdquo: "„",
+  ldquo: "“",
+  rdquo: "”",
+  lsquo: "‚",
+  rsquo: "’",
+  laquo: "«",
+  raquo: "»",
+};
+
 function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, code) =>
-      String.fromCodePoint(parseInt(code, 16))
-    )
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    html
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, code) =>
+        String.fromCodePoint(parseInt(code, 16))
+      )
+      .replace(/&(\w+);/g, (match, name) => NAMED_ENTITIES[name] ?? match)
+      .replace(/\s+/g, " ")
+      // Durch das Ersetzen von Tags durch Leerzeichen entstehen Lücken
+      // vor Satzzeichen ("Wort , Wort") und nach öffnenden Klammern
+      .replace(/\s+([,.;:!?)\]])/g, "$1")
+      .replace(/([([])\s+/g, "$1")
+      .trim()
+  );
 }
 
 // Werbe-/Angebotsmeldungen, die keine News sind
@@ -158,6 +187,29 @@ function toArticle(item: RawItem, source: RssSource): Article | null {
   };
 }
 
+/**
+ * Dekodiert den Feed mit dem richtigen Zeichensatz. `res.text()` nimmt
+ * stur UTF-8 an – Feeds wie Golem.de liefern aber ISO-8859-1, wodurch
+ * Umlaute als U+FFFD (�) in der Datenbank landen würden.
+ */
+function decodeFeed(buffer: ArrayBuffer, contentType: string | null): string {
+  const utf8 = new TextDecoder("utf-8").decode(buffer);
+  // Sauberes UTF-8 (keine Ersatzzeichen) -> fertig
+  if (!utf8.includes("�")) return utf8;
+
+  // Sonst deklarierten Zeichensatz aus HTTP-Header oder XML-Deklaration
+  // verwenden; Fallback windows-1252 (Obermenge von ISO-8859-1)
+  const declared =
+    contentType?.match(/charset=["']?([\w-]+)/i)?.[1] ||
+    utf8.slice(0, 200).match(/encoding=["']([\w-]+)["']/i)?.[1] ||
+    "windows-1252";
+  try {
+    return new TextDecoder(declared).decode(buffer);
+  } catch {
+    return utf8;
+  }
+}
+
 async function fetchRssSource(source: RssSource): Promise<Article[]> {
   const res = await fetch(source.url, {
     headers: { "User-Agent": "Mozilla/5.0 (MedicalITPost NewsBot)" },
@@ -167,7 +219,10 @@ async function fetchRssSource(source: RssSource): Promise<Article[]> {
   if (!res.ok) {
     throw new Error(`${source.name}: HTTP ${res.status}`);
   }
-  const xml = await res.text();
+  const xml = decodeFeed(
+    await res.arrayBuffer(),
+    res.headers.get("content-type")
+  );
   return parseFeed(xml)
     .map((item) => toArticle(item, source))
     .filter((a): a is Article => a !== null);

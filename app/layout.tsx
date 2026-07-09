@@ -2,6 +2,15 @@ import type { Metadata } from "next";
 import { Old_Standard_TT } from 'next/font/google';
 import "./globals.css";
 import { MenuProvider } from "./context/MenuContext";
+import JsonLd from "./components/json-ld";
+import {
+  SITE_DESCRIPTION,
+  SITE_KEYWORDS,
+  SITE_NAME,
+  SITE_TITLE,
+  siteJsonLd,
+} from "@/lib/seo";
+import { getBaseUrl } from "@/lib/mailer";
 
 // Klassische Zeitungs-Antiqua mit sauberen deutschen Umlauten
 // (latin-ext für ä, ö, ü, ß und „deutsche Anführungszeichen“)
@@ -14,8 +23,29 @@ const oldStandard = Old_Standard_TT({
 
 
 export const metadata: Metadata = {
-  title: "Medical IT Posts",
-  description: "Daily news about the medical it",
+  metadataBase: new URL(getBaseUrl()),
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    locale: "de_DE",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
@@ -31,6 +61,7 @@ export default function RootLayout({
       <body
         className={`${oldStandard.variable} antialiased`}
       >
+        <JsonLd data={siteJsonLd()} />
         <MenuProvider>
           {children}
         </MenuProvider>

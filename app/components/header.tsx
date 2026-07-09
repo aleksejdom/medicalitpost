@@ -23,7 +23,7 @@ export default function HeaderBlock() {
 
       <Link href="/" className='flex flex-col md:items-center justify-center gap-3'>
         <h1 className='md:text-7xl text-2xl text-left md:text-center'>THE MEDICAL IT POST</h1>
-        <p className='md:text-xl text-sm uppercase md:text-center text-left text-zinc-400 tracking-widest'>Aktuelle IT Fakten für die Medizin – täglich kompakt und relevant</p>
+        <p className='md:text-xl text-sm uppercase md:text-center text-left text-zinc-400 tracking-widest'>News aus IT &amp; Gesundheitswesen – täglich kompakt und relevant</p>
       </Link>
     </div>
   )

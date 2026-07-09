@@ -10,13 +10,51 @@ export function isMailConfigured(): boolean {
 }
 
 export function getBaseUrl(): string {
-  return (process.env.BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+  // Fallback-Kette: explizite BASE_URL -> Produktions-Domain auf Vercel
+  // -> lokale Entwicklung. Verhindert localhost-Links in Produktion,
+  // falls BASE_URL dort nicht gesetzt ist.
+  const url =
+    process.env.BASE_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "http://localhost:3000");
+  return url.replace(/\/$/, "");
+}
+
+// Gepoolter Transporter: hält die SMTP-Verbindung über den ganzen
+// Newsletter-Versand offen, statt pro Empfänger neu zu verbinden –
+// viele Einzelverbindungen in kurzer Folge wirken auf Mailserver
+// wie Bot-Verhalten und drücken die Reputation.
+let transporter: nodemailer.Transporter | null = null;
+
+function getTransporter(): nodemailer.Transporter {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: Number(process.env.SMTP_PORT) === 465,
+      pool: true,
+      maxConnections: 2,
+      auth: process.env.SMTP_USER
+        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        : undefined,
+    });
+  }
+  return transporter;
 }
 
 export async function sendMail(options: {
   to: string;
   subject: string;
   html: string;
+  /** Reine Text-Alternative (multipart/alternative senkt den Spam-Score). */
+  text?: string;
+  /**
+   * Abmelde-URL für die List-Unsubscribe-Header (RFC 8058 One-Click).
+   * Gmail/Yahoo verlangen diese Header seit 2024 für Newsletter;
+   * nur bei Massenmails setzen, nicht bei transaktionalen Mails.
+   */
+  unsubscribeUrl?: string;
 }): Promise<void> {
   if (!isMailConfigured()) {
     console.warn(
@@ -30,19 +68,17 @@ export async function sendMail(options: {
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: Number(process.env.SMTP_PORT) === 465,
-    auth: process.env.SMTP_USER
-      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-      : undefined,
-  });
-
-  await transporter.sendMail({
+  await getTransporter().sendMail({
     from: process.env.MAIL_FROM,
     to: options.to,
     subject: options.subject,
     html: options.html,
+    text: options.text,
+    headers: options.unsubscribeUrl
+      ? {
+          "List-Unsubscribe": `<${options.unsubscribeUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        }
+      : undefined,
   });
 }

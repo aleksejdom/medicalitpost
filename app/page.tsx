@@ -10,6 +10,10 @@ import { CATEGORIES } from "@/lib/categorize";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  alternates: { canonical: "/" },
+};
+
 export default async function Home() {
   // Hält das Archiv tagesaktuell (synct höchstens einmal pro Stunde)
   await ensureFreshArticles(60);

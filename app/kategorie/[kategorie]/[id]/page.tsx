@@ -16,8 +16,45 @@ import { getArticle, getArticlesByCategory } from "@/lib/articleStore";
 import { CATEGORIES } from "@/lib/categorize";
 import ArticleImage from "@/app/components/article-image";
 import NewsletterSignup from "@/app/components/newsletter-signup";
+import JsonLd from "@/app/components/json-ld";
+import { breadcrumbJsonLd, newsArticleJsonLd } from "@/lib/seo";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ kategorie: string; id: string }>;
+}): Promise<Metadata> {
+  const { kategorie, id } = await params;
+  const article = await getArticle(kategorie, id);
+  if (!article) return {};
+
+  const label = CATEGORIES[kategorie] || kategorie;
+  const path = `/kategorie/${kategorie}/${id}`;
+  const description = article.description.slice(0, 160);
+
+  return {
+    title: article.title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "article",
+      title: article.title,
+      description,
+      url: path,
+      publishedTime: article.date,
+      section: label,
+      ...(article.image ? { images: [article.image] } : {}),
+    },
+    twitter: {
+      card: article.image ? "summary_large_image" : "summary",
+      title: article.title,
+      description,
+    },
+  };
+}
 
 export default async function ArtikelPage({
   params,
@@ -47,6 +84,14 @@ export default async function ArtikelPage({
 
   return (
     <div className="flex bg-zinc-50 font-sans dark:bg-black flex-col items-center justify-center w-full p-4 md:p-3">
+      <JsonLd data={newsArticleJsonLd(article, label)} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: label, path: `/kategorie/${kategorie}` },
+          { name: article.title },
+        ])}
+      />
       <HeaderBlock />
       <NavigationBlock />
 

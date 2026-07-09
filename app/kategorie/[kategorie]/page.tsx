@@ -8,8 +8,37 @@ import FooterBlock from "@/app/components/footer";
 import ArticlesBlock from "@/app/components/articles";
 import { getArticlesByCategory } from "@/lib/articleStore";
 import { CATEGORIES } from "@/lib/categorize";
+import JsonLd from "@/app/components/json-ld";
+import { breadcrumbJsonLd, categoryJsonLd } from "@/lib/seo";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ kategorie: string }>;
+}): Promise<Metadata> {
+  const { kategorie } = await params;
+  const label = CATEGORIES[kategorie];
+  if (!label) return {};
+
+  const path = `/kategorie/${kategorie}`;
+  const description =
+    `${label}: aktuelle News aus IT & Gesundheitswesen – ` +
+    `täglich kompakt zusammengefasst von The Medical IT Post.`;
+
+  return {
+    title: `${label} – News aus IT & Gesundheitswesen`,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      title: `${label} – News aus IT & Gesundheitswesen`,
+      description,
+      url: path,
+    },
+  };
+}
 
 export default async function KategoriePage({
   params,
@@ -26,6 +55,13 @@ export default async function KategoriePage({
 
   return (
     <div className="flex bg-zinc-50 font-sans dark:bg-black flex-col items-center justify-center w-full p-4 md:p-3">
+      <JsonLd data={categoryJsonLd(label || kategorie, kategorie, articles)} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: label || kategorie },
+        ])}
+      />
       <HeaderBlock />
       <NavigationBlock />
 

@@ -97,6 +97,43 @@ function layout(bodyRows: string, unsubscribeUrl: string): string {
 </body></html>`;
 }
 
+/**
+ * Reine Text-Fassung des Newsletters. HTML-only-Mails ohne
+ * multipart/alternative werden von Spam-Filtern schlechter bewertet.
+ */
+export function buildNewsletterText(
+  articles: StoredArticle[],
+  unsubscribeUrl: string
+): string {
+  const baseUrl = getBaseUrl();
+  const sections = articles.map((article) => {
+    const url = `${baseUrl}/kategorie/${article.category}/${article.id}`;
+    const label = CATEGORIES[article.category] || article.category;
+    return [
+      label.toUpperCase(),
+      article.title,
+      "",
+      article.description.slice(0, 400) +
+        (article.description.length > 400 ? "…" : ""),
+      "",
+      `Beitrag lesen: ${url}`,
+    ].join("\n");
+  });
+
+  return [
+    "THE MEDICAL IT POST",
+    "Aktuelle IT-Fakten für die Medizin",
+    "",
+    sections.join("\n\n----------------------------------------\n\n"),
+    "",
+    "----------------------------------------",
+    "Sie erhalten diese E-Mail, weil Sie den Newsletter von",
+    "The Medical IT Post abonniert und die Anmeldung bestätigt haben.",
+    `Newsletter abbestellen: ${unsubscribeUrl}`,
+    `Datenschutz: ${baseUrl}/datenschutz`,
+  ].join("\n");
+}
+
 /** Baut den kompletten Newsletter: News 1 – Werbe-Section – News 2. */
 export async function buildNewsletterHtml(
   articles: StoredArticle[],
@@ -145,10 +182,13 @@ export async function sendDailyNewsletter(): Promise<SendReport> {
 
   for (const subscriber of subscribers) {
     try {
+      const unsubscribe = unsubscribeUrl(subscriber);
       await sendMail({
         to: subscriber.email,
         subject: `Ihre News aus IT & Gesundheitswesen: ${articles[0].title}`,
-        html: await buildNewsletterHtml(articles, unsubscribeUrl(subscriber)),
+        html: await buildNewsletterHtml(articles, unsubscribe),
+        text: buildNewsletterText(articles, unsubscribe),
+        unsubscribeUrl: unsubscribe,
       });
       recipients++;
     } catch (error) {
@@ -194,9 +234,24 @@ export async function sendConfirmationMail(
         für den Newsletter-Versand verwendet.
       </p>
     </td></tr>`;
+  // Transaktionale Mail: bewusst ohne List-Unsubscribe-Header.
   await sendMail({
     to: subscriber.email,
     subject: "Bitte bestätigen: Newsletter-Anmeldung bei The Medical IT Post",
     html: layout(rows, unsubscribeUrl(subscriber)),
+    text: [
+      "THE MEDICAL IT POST",
+      "",
+      "Bitte bestätigen Sie Ihre Anmeldung",
+      "",
+      "Sie haben den täglichen Newsletter von The Medical IT Post",
+      "angefordert. Bitte bestätigen Sie Ihre Anmeldung über diesen",
+      "Link – erst danach erhalten Sie unseren Newsletter (Double-Opt-in):",
+      "",
+      confirmUrl(subscriber),
+      "",
+      "Falls Sie sich nicht angemeldet haben, ignorieren Sie diese",
+      "E-Mail einfach – es werden dann keine weiteren E-Mails verschickt.",
+    ].join("\n"),
   });
 }
