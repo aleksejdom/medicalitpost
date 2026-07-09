@@ -46,6 +46,25 @@ function getTransporter(): nodemailer.Transporter {
   return transporter;
 }
 
+/**
+ * Baut die Absender-Adresse aus MAIL_FROM. Toleriert überzählige
+ * Anführungszeichen in der Env-Variable ('"adresse@domain.de"') –
+ * die würden sonst als quoted local-part interpretiert und der
+ * Mailserver hängt seine eigene Domain an
+ * ('"redaktion@medicalitpost.de"@ispgateway.de').
+ */
+export function getFromAddress():
+  | string
+  | { name: string; address: string } {
+  const raw = (process.env.MAIL_FROM || "").trim();
+  const match = raw.match(/<\s*([^<>\s]+)\s*>/);
+  if (match) {
+    const name = raw.replace(match[0], "").replace(/["']/g, "").trim();
+    return name ? { name, address: match[1] } : match[1];
+  }
+  return raw.replace(/["']/g, "").trim();
+}
+
 export async function sendMail(options: {
   to: string;
   subject: string;
@@ -72,7 +91,7 @@ export async function sendMail(options: {
   }
 
   await getTransporter().sendMail({
-    from: process.env.MAIL_FROM,
+    from: getFromAddress(),
     to: options.to,
     subject: options.subject,
     html: options.html,
