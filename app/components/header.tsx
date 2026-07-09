@@ -10,13 +10,17 @@ export default function HeaderBlock() {
 
   return (
     <div className='relative md:p-5 p-2 bg-white flex flex-col items-center justify-center w-full md:mb-5'>
-      {/* Burger Icon - Mobile Only */}
+      {/* Burger-Toggle – Mobile: fixed oben rechts, immer erreichbar
+          (z-50 liegt über Menü z-40 und Overlay z-30) */}
       <button
         onClick={toggleMenu}
-        className={`absolute top-5 right-5 md:hidden z-50 focus:outline-none transition-colors duration-300 ${
-          isOpen ? 'text-white' : 'text-gray-700 hover:text-blue-500'
+        className={`fixed top-4 right-4 md:hidden z-50 p-2 rounded-full border shadow-md focus:outline-none transition-colors duration-300 ${
+          isOpen
+            ? 'bg-zinc-900/90 border-zinc-700 text-white'
+            : 'bg-white/95 border-gray-300 text-gray-700 hover:text-blue-500'
         }`}
-        aria-label='Toggle menu'
+        aria-label={isOpen ? 'Menü schließen' : 'Menü öffnen'}
+        aria-expanded={isOpen}
       >
         {isOpen ? <X className='w-6 h-6' /> : <Menu className='w-6 h-6' />}
       </button>
