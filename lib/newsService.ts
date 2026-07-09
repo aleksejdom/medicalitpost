@@ -50,6 +50,10 @@ const NAMED_ENTITIES: Record<string, string> = {
 function stripHtml(html: string): string {
   return (
     html
+      // Script-/Style-Blöcke samt INHALT entfernen – nur die Tags zu
+      // strippen würde den JavaScript-Code als Fließtext stehen lassen
+      // (z.B. Datawrapper-Embed-Snippets in Feed-Inhalten)
+      .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
       .replace(/<[^>]*>/g, " ")
       .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
       .replace(/&#x([0-9a-f]+);/gi, (_, code) =>
@@ -72,6 +76,8 @@ function stripHtml(html: string): string {
  */
 function stripHtmlKeepParagraphs(html: string): string {
   return html
+    // Vor dem Absatz-Split entfernen, falls ein Script Block-Tags enthält
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
     .replace(/<br\s*\/?>/gi, "¶")
     .replace(/<\/(p|div|li|h[1-6]|blockquote|tr)>/gi, "¶")
     .split("¶")
