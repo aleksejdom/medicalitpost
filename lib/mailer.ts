@@ -16,9 +16,12 @@ export function getBaseUrl(): string {
   const url =
     process.env.BASE_URL ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      ? process.env.VERCEL_PROJECT_PRODUCTION_URL
       : "http://localhost:3000");
-  return url.replace(/\/$/, "");
+  // BASE_URL darf auch ohne Schema gesetzt sein ("medicalitpost.de") –
+  // new URL() würde daran scheitern (so schlug der Vercel-Build fehl)
+  const withScheme = /^https?:\/\//.test(url) ? url : `https://${url}`;
+  return withScheme.replace(/\/$/, "");
 }
 
 // Gepoolter Transporter: hält die SMTP-Verbindung über den ganzen
